@@ -1,7 +1,10 @@
 package cleanArchitectureExample.infrastructure.outputport;
 
+import org.springframework.stereotype.Service;
+
 import java.util.List;
 
+@Service
 public interface EntityRepository {
 
     public <T> T save( T reg );
