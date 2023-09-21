@@ -1,8 +1,7 @@
 package cleanArchitectureExample.infrastructure.outputadapter.postgresrepository;
 
 import cleanArchitectureExample.infrastructure.outputport.EntityRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
@@ -16,32 +15,37 @@ import java.util.Collections;
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
 public class PostgresRepository implements EntityRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
-    @SneakyThrows
     @Override
     public <T> T save(T reg) {
-        // Get the fields and their values from the entity object
-        Field[] entityFields = reg.getClass().getDeclaredFields();
-        String[] fields = new String[entityFields.length];
-        Object[] fieldValues = new Object[entityFields.length];
 
-        for (int i = 0; i < entityFields.length; i++) {
-            fields[i] = entityFields[i].getName();
-            fieldValues[i] = entityFields[i].get(reg);
+        Field[] entityFields = reg.getClass().getDeclaredFields();
+
+        String[] fields = new String[ entityFields.length ];
+        Object[] fieldValues = new Object[ entityFields.length ];
+
+        try {
+            for ( int i=0; i<entityFields.length; i++ ) {
+                fields[i] = entityFields[i].getName();
+                fieldValues[i] = reg.getClass()
+                        .getMethod( "get"+entityFields[i].getName().substring(0,1).toUpperCase()+entityFields[i].getName().substring(1) )
+                        .invoke( reg );
+            }
+        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
+                 | NoSuchMethodException | SecurityException e) {
+            e.printStackTrace();
         }
 
-        // Generate SQL INSERT statement dynamically
-        String sql = "INSERT INTO " +
+        String sql = "INSERT INTO \"" +
                 reg.getClass().getSimpleName() +
-                "(" + String.join(",", fields) + ")" +
+                "\"(" + String.join(",", fields) + ")" +
                 " VALUES " +
                 "(" + String.join(",", Collections.nCopies(fields.length, "?")) + ")";
 
-        // Execute the SQL INSERT statement using JdbcTemplate
         jdbcTemplate.update(sql, fieldValues);
 
         return reg;
@@ -49,25 +53,24 @@ public class PostgresRepository implements EntityRepository {
 
     @Override
     public <T> T getById(String id, Class<T> clazz) {
-        // Retrieve an entity object by its ID from the database
-        List<T> list = jdbcTemplate.query("SELECT * FROM " + clazz.getSimpleName() + " WHERE id = ?",
-                new LombokRowMapper<>(clazz),
+        List<T> list = jdbcTemplate.query("SELECT * FROM \"" + clazz.getSimpleName() + "\" WHERE id = ?",
+                new LombokRowMapper<T>(clazz),
                 id);
 
-        return list.isEmpty() ? null : list.get(0);
+        if ( !list.isEmpty() ) return list.get(0);
+
+        return null;
     }
 
     @Override
     public <T> List<T> getAll(Class<T> clazz) {
-        // Retrieve a list of all entities of a given type from the database
-        return jdbcTemplate.query("SELECT * FROM " + clazz.getSimpleName(), new LombokRowMapper<>(clazz));
+        return jdbcTemplate.query("SELECT * FROM \"" + clazz.getSimpleName() + "\"", new LombokRowMapper<T>(clazz));
     }
 
-    // RowMapper to map SQL ResultSet to entity objects
     private static class LombokRowMapper<T> implements RowMapper<T> {
-        private final Class<?> clazz;
+        private Class<?> clazz = null;
 
-        public LombokRowMapper(Class<?> clazz) {
+        public LombokRowMapper( Class<?> clazz ) {
             this.clazz = clazz;
         }
 
@@ -103,5 +106,6 @@ public class PostgresRepository implements EntityRepository {
 
             return null;
         }
+
     }
 }

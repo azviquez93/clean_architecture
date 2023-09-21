@@ -22,8 +22,8 @@ public class UserUseCase implements UserInputPort {
     public User createUser(String firstName, String lastName, String password) {
         User user = User.builder()
                 .id(UUID.randomUUID().toString())
-                .firstName(firstName)
-                .lastName(lastName)
+                .firstname(firstName)
+                .lastname(lastName)
                 .password(password)
                 .build();
 
